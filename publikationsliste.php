@@ -3,16 +3,37 @@
 /**
  * PHP-Bibliothek zum Erstellen von Publikationslisten
  * 
- * Publikationslisten werden in zwei Schritten erstellt: Zunaechst wird ueber eine Abfrage an den Katalog (an PSI oder PERLIS) eine Liste von PPNs zusammengestellt. Anschliessend werden die dazugehoerigen Metadaten ueber die unAPI-Schnittstelle des GBV hinzugeholt. Anwendungsbeispiele finden Sie im Unterordner "/beispiele". Beachten Sie auch die Dokumentation unter http://www.gbv.de/wikis/cls/Publikationslisten. Dieses Skript soll als Vorlage fuer eigene Anwendungen dienen und wartet darauf, eingesetzt und erweitert zu werden. 
+ * Publikationslisten werden in zwei Schritten erstellt: Zunaechst wird ueber
+ * eine Abfrage an den Katalog (an PSI) eine Liste von PPNs zusammengestellt.
+ * Anschliessend werden die dazugehoerigen Metadaten ueber die unAPI-Schnittstelle
+ * des GBV hinzugeholt. Anwendungsbeispiele finden Sie im Unterordner
+ * "/beispiele". Beachten Sie auch die Dokumentation unter
+ * http://www.gbv.de/wikis/cls/Publikationslisten. Dieses Skript soll als Vorlage
+ * fuer eigene Anwendungen dienen und wartet darauf, eingesetzt und erweitert zu
+ * werden. 
  * 
  * Die Bibliothek ist prozedural programmiert. Nach Einbindung stehen die Funktionen
  * - get_ppns_from_psi() fuer die Suche in einem PSI-System, 
- * - get_ppns_from_collectionws() fuer die Abfrage der PERLIS-Kollektionen ueber den PERLIS-Webservice und 
  * - get_records_via_unapi() fuer die Abfrage der Metadaten
- * fuer die externe Programmierung zur Verfuegung. Alle weiteren Einstellungen erfolgen ueber das Konfigurationsarray $publistconf. Deren Standardeinstellungen werden bei Einbindung der Bibliothek gesetzt, sofern diese nicht vorher extern vom Programmierer definiert wurden. Alle Programmmeldungen und Fehler koennen in einer externen Datei mitgeloggt werden. 
+ * fuer die externe Programmierung zur Verfuegung. Alle weiteren Einstellungen 
+ * erfolgen ueber das Konfigurationsarray $publistconf. Deren Standardeinstellungen 
+ * werden bei Einbindung der Bibliothek gesetzt, sofern diese nicht vorher extern vom 
+ * Programmierer definiert wurden. Alle Programmmeldungen und Fehler koennen in einer 
+ * externen Datei mitgeloggt werden.
  *
- * Caching: Damit der Katalog nicht bei jeder Anzeige der Publikationsliste neu abgefragt werden muss, kann die gesamte Ausgabe - inklusive der extern hinzugefuegten Programmierung - gecacht werden. Da die gesamte Ausgabe gecacht wird, vertraegt sich dieses Verfahren nicht mit automatisch generierten Suchanfragen. Das Caching ist gedacht um den Katalog von wiederkehrenden Anfrgen zu entlasten, die mit hoher Wahrscheinlichkeit zum gleichen Ergebnis fuehren. Wenn Sie Ihre Anfrage dynamisch veraendern und dennoch cachen moechten, muessen Sie Ihre Ausgabe in verschiedene Cache-Dateien speichern. Dies erreichen Sie, indem Sie dem Skript einen dynamisch generierten Dateinamen als Cache-Datei uebergeben. 
- * Damit der Cache-Mechanismus funktioniert, darf das eigene Skript keine der Output Control Funktionen (flush(), ob_*()) verwenden. Zu Beachten ist auch, dass im Debugging-Modus die Logging-Meldungen ebenfalls gecacht werden, was unter Umstaenden zu Verwirrung fuehren kann ;-)  Nach Ablauf des Caching-Intervals wird der Cache bei erneutem Aufruf des Skriptes automatisch neu befuellt.
+ * Caching: Damit der Katalog nicht bei jeder Anzeige der Publikationsliste neu abgefragt 
+ * werden muss, kann die gesamte Ausgabe - inklusive der extern hinzugefuegten Programmierung
+ * - gecacht werden. Da die gesamte Ausgabe gecacht wird, vertraegt sich dieses Verfahren 
+ * nicht mit automatisch generierten Suchanfragen. Das Caching ist gedacht um den Katalog 
+ * von wiederkehrenden Anfrgen zu entlasten, die mit hoher Wahrscheinlichkeit zum gleichen 
+ * Ergebnis fuehren. Wenn Sie Ihre Anfrage dynamisch veraendern und dennoch cachen moechten, 
+ * muessen Sie Ihre Ausgabe in verschiedene Cache-Dateien speichern. Dies erreichen Sie, 
+ * indem Sie dem Skript einen dynamisch generierten Dateinamen als Cache-Datei uebergeben. 
+ * Damit der Cache-Mechanismus funktioniert, darf das eigene Skript keine der Output Control
+ * Funktionen (flush(), ob_*()) verwenden. Zu Beachten ist auch, dass im Debugging-Modus die
+ * Logging-Meldungen ebenfalls gecacht werden, was unter Umstaenden zu Verwirrung fuehren 
+ * kann ;-)  Nach Ablauf des Caching-Intervals wird der Cache bei erneutem Aufruf des Skriptes 
+ * automatisch neu befuellt.
  * 
  * Die Konfigurationsparameter im Ueberblick:
  * - $publistconf[unapiformat] : Metadatenformat, das von der unAPI-Schnittstelle zurueckgeliefert werden soll. Name muss den unter http://unapi.gbv.de verfuegbaren Formaten entsprechen. Angabe erforderlich, falls bei Aufruf der Funktion get_records_via_unapi() kein Format uebergeben wird.
@@ -24,7 +45,6 @@
  * - $publistconf[interval] : Legt fest, wann der Cache geleert werden soll. Angabe in Sekunden. Voreinstellung ist 60*60*24 = taegliche Aktualisierung.
  * - $publistconf[purge] : Erzwingt Ignorieren des Caches - auch wenn Cachefile angegeben und Interval noch nicht abgelaufen. Variable kann extern gesetzt oder per GET oder POST uebergeben werden. Voreingestellt wird die Variable $_REQUEST['purge'] ausgelesen.
  *
-
  * Verwendung dieser PHP-Bibliothek
  * 1. Schritt: Konfigurationsparameter setzen, z.B. in der Form "$publistcon[interval] = 60;"
  * 2. Schritt: PHP-Bibliothek einbinden ueber den Befehl "require 'Publikationsliste.php';"
@@ -115,14 +135,22 @@ function create_psi_link($psibase, $ikt, $search, $sort="") {
 /**
  * Schickt Suche an PSI-System und liefert Array mit PPNs zurueck
  * 
- * Schickt Suchanfrage an ein PSI-System. Benutzt dabei "XML-Schnittstelle" und liefert eine Liste von PPNs in Form eines Array zurueck. Die Treffermenge kann begrenzt werden. Durch einen Parameter, der an das liefernde PSI-System uebergeben wird, kann das Ergebnis auch sortiert werden. Die Sortiermoeglichkeiten haengen allerdings vom Liefersystem ab. PSI-Systeme erlauben i.d.R. eine Sortierung nach 
+ * Schickt Suchanfrage an ein PSI-System. Benutzt dabei "XML-Schnittstelle" und
+ * liefert eine Liste von PPNs in Form eines Array zurueck. Die Treffermenge kann
+ * begrenzt werden. Durch einen Parameter, der an das liefernde PSI-System
+ * uebergeben wird, kann das Ergebnis auch sortiert werden. Die
+ * Sortiermoeglichkeiten haengen allerdings vom Liefersystem ab. PSI-Systeme
+ * erlauben i.d.R. eine Sortierung nach 
+ *
  * - YOP = Erscheinungsjahr
  * - RLV = Relevanz
  * - LST_a = Autor und 
  * - LST_t = Titel. 
  * Voreingestellt wird kein Sortierparameter uebergeben, das Skript liefert dann die Treffer in der Standardsortierung des gewaehlten Kataloges zurueck.
  *
- * Da die Abfrage ueber die so genannte XML-Schnittstelle erfolgt ( die im Gegensatz z.B. zu SRU nicht standardisiert ist) muss sich die Funktion durch die Kurztitellisten hangeln, die jeweils nur 10 Datensaetze auf einmal uebermitteln. Mit einer sauber standardisierten und implementierten Schnittstelle koennte man mehr machen ... ;) vgl. den PERLIS-Webservice.
+ * Da die Abfrage ueber die so genannte XML-Schnittstelle erfolgt ( die im Gegensatz z.B. zu SRU nicht standardisiert ist)
+ * muss sich die Funktion durch die Kurztitellisten hangeln, die jeweils nur 10 Datensaetze auf einmal uebermitteln.
+ * Mit einer sauber standardisierten und implementierten Schnittstelle koennte man mehr machen ... ;)
  *
  * @param string Basis-URL, z.B. "http://gso.gbv.de/DB=2.1/"
  * @param int Suchschluessel. Wo soll gesucht werden, z.B. in "1004" fuer Suche nach Personenname
@@ -193,55 +221,6 @@ function get_ppns_from_psi($psibase, $ikt, $search, $limit="", $sort="") {
     return $ppns;
 }
 
-
-/**
- * Liest eine PERLIS-Sammlung aus
- *
- * Liefert ein Array mit PPNs. Derzeit hat jeder PERLIS-Benutzer auf alle Sammlungen lesenden Zugriff - irgend ein Benutzeraccount genuegt daher. 
- *
- * @param string Benutzername
- * @param string Passwort
- * @param string Datenbank-Id, fuer GBV-PERLIS derzeit "2.101"
- * @param int Sammlungs-Id
- */
-function get_ppns_from_collectionws($username, $password, $dbsid, $cid) {
-
-	$ppns = array();
-    $collectionws = "http://perlis.gbv.de/ws/collectionws.wsdl";
-	
-    try {
-    	$client = @new SoapClient($collectionws, array('exceptions' => 1));
-    }
-	# Fehler, falls Webservice-Definition nicht verfuegbar
-    catch (Exception $e) {
-		$errormsg = $e->faultcode ." : ". $e->faultstring;
-		log_msg ("Failed to read service description: $errormsg", -1);
-		return FALSE;
-	}
-	
-    $reply = $client->getPPNs(
-        array('dbsid' => $dbsid, 'username' => $username, 'password' => $password, 'cid' => $cid)
-    );
-	
-	# Fehler, falls Webservice PPNs nicht zurueckgeben kann
-    if (is_soap_fault($reply)) {
-        $errormsg = $reply->faultcode ." : ". $reply->faultstring;
-		log_msg ("Service reports error: $errormsg", -1);
-        return FALSE;
-    }
-
-    # SOAP-Antwort in einfaches Array umwandeln
-    if (is_array($reply->ppn)) {
-        foreach ($reply->ppn as $ppn) {
-            $ppns[] = $ppn->ppn;
-        }
-    } else { # Sonderfall ein Treffer
-        if (isset($reply->ppn))
-            $ppns = array($reply->ppn->ppn);
-    }
-
-    return $ppns;
-}
 
 
 /**
