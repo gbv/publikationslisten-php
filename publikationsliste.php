@@ -261,6 +261,32 @@ function get_records_via_unapi($server, $ids, $format="", $prefix="") {
     return $records;
 }
 
+function get_records_via_sru( $server, $cql, $format="" ) {
+    global $publistconf;
+    if (!$format) $format = $publistconf['unapiformat'];
+    
+    $records = array();
+
+    $cql = urlencode($cql);
+    $url = "$server?recordSchema=$format&version=1.1&operation=searchRetrieve&maximumRecords=500&query=$cql&startRecord=1";
+    $xml = @file_get_contents($url);
+
+    if (!$xml) return array();
+
+    $dom = new DOMDocument();
+    $dom->loadXML($xml);
+    $ns = "http://www.loc.gov/zing/srw/";
+    $rec = $dom->documentElement; 
+
+    $rec = $dom->documentElement->getElementsByTagNameNS($ns,"records")->item(0);
+    if ($rec) $rec = $rec->getElementsByTagNameNS($ns,"record");
+    for($i=0; $i<$rec->length; $i++) {
+        $r = $rec->item($i)->getElementsByTagNameNS($ns,"recordData")->item(0)->firstChild;
+        $records[] = $r;
+    }
+
+    return $records;
+}
 
 /**
  * Cache lesen, falls aktueller Cache vorhanden
